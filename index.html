@@ -16,7 +16,9 @@ function change_type(v) {}
 const sample_rate = 2400000;
 const freq_bins = 1024;
 const freq_spacing = sample_rate / freq_bins;
-var current_freq = 106400000;
+var current_freq = 162550000;
+var convert = 1000000;
+
 
 function not_connected() {
 	return Promise.reject("Not connected");
@@ -58,7 +60,7 @@ function mouseMove(e) {
 	if (down) {
 		let dist = start_pos - e.clientX;
 		let freq = start_freq + dist * freq_spacing;
-		freq = Math.min(Math.max(freq, 88000000), 108000000);
+		//freq = Math.min(Math.max(freq, 88000000), 108000000);
 		if (Math.abs(freq - current_freq) > freq_spacing) {
 			change_freq(freq);
 		}
@@ -75,6 +77,7 @@ function mouseUp(e) {
 	start_pos = undefined;
 	start_freq = undefined;
 	down = false;
+	document.getElementById("current_freq").value=Math.round(1000*current_freq/convert)/1000;
 }
 
 function update_status(e) {
@@ -111,12 +114,12 @@ const filters = [
 function connect(button) {
 	navigator.usb.requestDevice({filters: filters})
 		.then(powerUp).then(() => {
-			button.innerHTML = "Disconnect";
+			button.innerHTML = "■";
 		}, handle_error);
 }
 
 function disconnect(button) {
-	button.innerHTML = "Connect";
+	button.innerHTML = '>';
 	update_status("Disconnected");
 	read_samples = not_connected;
 	set_center_freq = not_connected;
@@ -125,7 +128,7 @@ function disconnect(button) {
 
 function leaving(event) {
 	button = document.getElementById("device-toggle");
-	if (button.innerHTML == "Connect")
+	if (button.innerHTML == '>')
 		return;
 
 	// pointless, browser not waiting for promises to finish:
@@ -138,7 +141,7 @@ function leaving(event) {
 window.addEventListener('beforeunload', leaving);
 
 function toggle_device(button) {
-	if (button.innerHTML == "Connect")
+	if (button.innerHTML == '>')
 		connect(button);
 	else
 		disconnect(button);
@@ -158,7 +161,7 @@ navigator.usb.getDevices()
 		if (device != undefined) {
 			return powerUp(device).then(() => {
 				let button = document.getElementById("device-toggle");
-				button.innerHTML = "Disconnect";
+				button.innerHTML = "■";
 			});
 		}
 	}).catch(handle_error);
@@ -167,7 +170,7 @@ function toggle_rainbow() {}
 function toggle_phosphor() {}
 function toggle_background() {}
 
-WebAssembly.instantiateStreaming(fetch("https://www.aicodex.de/examlpe8/example.wasm"))
+WebAssembly.instantiateStreaming(fetch("example.wasm"))
 	.then(obj => {
 		const wasm = obj.instance.exports;
 		const buffer = wasm.memory.buffer;
@@ -185,7 +188,7 @@ WebAssembly.instantiateStreaming(fetch("https://www.aicodex.de/examlpe8/example.
 				style.color = "black";
 				style.backgroundColor = "white";
 			} else {
-				wasm.change_color(0x00ffffff);
+				wasm.change_color(0x00ffaa00);
 				style.color = "white";
 				style.backgroundColor = "black";
 			}
@@ -254,40 +257,96 @@ WebAssembly.instantiateStreaming(fetch("https://www.aicodex.de/examlpe8/example.
 		processor.connect(context.destination);
 	});
 
+
+//custom scripts
+document.body.onload = function(e){
+	toggle_phosphor();
+	toggle_background();
+	document.getElementById("type").value=2;
+	change_type(2);
+	document.getElementById("emphasis").value=0;
+	change_region(0);
+}
 </script>
-<p>
-<h1>WebUSB and WebAssembly RTL-SDR Example</h1>
-You need to build LLVM and Clang with the WebAssembly target enabled.<br />
-Get our C++ DSP code library from: <a href="https://github.com/aicodix/dsp">https://github.com/aicodix/dsp</a><br />
-Then use the <a href="Makefile">Makefile</a> to compile <a href="example.cc">example.cc</a> to <a href="example.wasm">example.wasm</a>.<br />
-Build WABT and use wasm2wat to get a human readable assembly.<br />
-Look at <a href="example.hh">example.hh</a> to find out how functions can be imported or exported and at <a href="quirks.hh">quirks.hh</a> for dealing with "-nostdlib".<br />
-This code is released under the <a href="https://landley.net/toybox/license.html">"zero clause" BSD license</a>. See <a href="LICENSE">LICENSE</a> for details.<br />
-Don't forget to disconnect when leaving this page.
-Below is the output of this example:
-</p>
-<p id="buttons">
-<button id="rainbow-toggle" onclick="toggle_rainbow();">toggle rainbow</button>
-<button id="phosphor-toggle" onclick="toggle_phosphor();">toggle phosphor</button>
-<button id="background-toggle" onclick="toggle_background();">toggle background</button>
-<button id="device-toggle" onclick="toggle_device(this);">Connect</button>
-<button id="status-bar" disabled>Not connected</button>
-<button id="actual-freq" disabled>Actual frequency</button>
-<select onchange="change_region(this.value)">
-<option value="1" selected>Europe and Asia</option>
-<option value="2">The Americas</option>
-<option value="0">No de-emphasis</option>
-</select>
-<select onchange="change_type(this.value)">
-<option value="0" selected>Stereo WFM</option>
-<option value="1">Mono WFM</option>
-<option value="2">Mono NFM</option>
-</select>
-</p>
-<p id="output" onmousemove="mouseMove(event);" onmousedown="mouseDown(event);" onmouseup="mouseUp(event);">
-<canvas id="scope"></canvas><br />
-<canvas id="spectrum"></canvas><br />
-<canvas id="spectrogram"></canvas>
-</p>
+
+
+<div class="top">
+	<button style="height:100px; width:100px;" width="7%" height="100%" id="device-toggle" onclick="toggle_device(this);"></button>
+	<input style="height:100px;" id="current_freq"/><button style="height:100px; width:100px;" onclick="change_freq(parseInt(document.getElementById('current_freq').value)*convert);document.getElementById('current_freq').value=Math.round(1000*current_freq/convert)/1000;">Go</button>
+</div>
+
+<div class="buttons" id="buttons">
+	<button id="rainbow-toggle" onclick="toggle_rainbow();" hidden>toggle rainbow</button>
+	<button id="phosphor-toggle" onclick="toggle_phosphor();">Smoothen</button>
+	<button id="background-toggle" onclick="toggle_background();" hidden>toggle background</button>
+	
+	<button id="status-bar" disabled>Not connected</button>
+	<button id="actual-freq" disabled>Actual frequency</button>
+	<select id="emphasis" onchange="change_region(this.value)">
+	<option value="1" selected>Europe and Asia</option>
+	<option value="2">The Americas</option>
+	<option value="0">No de-emphasis</option>
+	</select>
+	<select id="type" onchange="change_type(this.value)">
+	<option value="0" selected>Stereo WFM</option>
+	<option value="1">Mono WFM</option>
+	<option value="2">Mono NFM</option>
+	</select>
+	<button onclick="">test</button>
+</div>
+
+
+<div class="output" id="output" onmousemove="mouseMove(event);" onmousedown="mouseDown(event);" onmouseup="mouseUp(event);">
+	<canvas id="spectrum"></canvas><br />
+	<canvas id="spectrogram"></canvas>
+	<canvas id="scope" hidden></canvas><br />
+</div>
+
+
+
+<style>
+	button,input,select{
+		color:white;
+		background:#555;
+	}
+
+	.control{
+		filter:invert(1);
+	}
+
+	.top{
+		position:fixed;
+		left:0;
+		top:0;
+		width:100%;
+		height:7%;
+		font-size: 16px;
+		font-weight: bold;
+	}
+
+	.buttons{
+		position:fixed;
+		right:0;
+		top:110px;
+		width:25%;
+
+	}
+
+	.output {
+		width:75%;
+		position:fixed;
+		left:0;
+		top:10%;
+	}
+
+	input{
+		border:none;
+		background:#555;
+	}
+	button {
+		background:#555;
+		border: none;
+	}
+</style>
 </body>
 </html>
